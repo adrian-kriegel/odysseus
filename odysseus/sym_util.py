@@ -23,7 +23,10 @@ def approximate_integers(expr, tolerance=1e-6):
     elif isinstance(expr, se.Function):
         # Apply conversion to each argument of the function
         return expr.func(*[approximate_integers(arg, tolerance) for arg in expr.args])
-    return expr
+    elif isinstance(expr, se.Matrix):
+        return se.Matrix([approximate_integers(e, tolerance) for e in expr]).reshape(expr.rows, expr.cols)
+    else:
+        return expr
 
 def subs_with_indexed(expr : se.Expr, q : se.Matrix, name : str):
     '''
