@@ -157,7 +157,7 @@ class Link:
         if from_name is None:
             from_name = self.name_
         
-        if from_name == to_name or to_name is self.name_:
+        if from_name == to_name or to_name == self.name_:
             res = Transform()
 
         elif self.parent_ is not None:
