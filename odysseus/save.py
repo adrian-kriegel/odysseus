@@ -19,7 +19,7 @@ def load_symengine(file):
     shape, data = pickle.load(file)
 
     if shape is None:
-        return data
+        return data[0]
     else:
         r,c = shape
         return se.Matrix(data).reshape(r, c)
