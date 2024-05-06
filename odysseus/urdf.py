@@ -20,6 +20,8 @@ from odysseus import \
     Transform,\
     inertia_matrix
 
+from odysseus.sym_util import approximate_integers
+
 def find_by_attr(node, tag_name : str, attr : str, value : str):
     
     return (e for e in node.getElementsByTagName(tag_name) if e.getAttribute(attr) == value)
@@ -29,7 +31,7 @@ def approximate(x : float, tolerance=1e-4):
     '''
     Approximates x as a rational number.
     '''
-    return sp.nsimplify(x, rational=True, tolerance=tolerance)
+    return se.sympify(sp.nsimplify(x, rational=True, tolerance=tolerance))
 
 def approximate_angle(x : float, accuracy=1e-4):
     '''
@@ -71,7 +73,7 @@ class URDFElement:
         origin = self.child('origin')
 
         return Transform() if origin is None else Transform(
-            URDFElement.parse_vector(origin.attr('xyz'), approximate), 
+            URDFElement.parse_vector(origin.attr('xyz'), lambda x: x), 
             URDFElement.parse_vector(origin.attr('rpy'), approximate_angle)
         )
 
@@ -103,10 +105,10 @@ class URDFElement:
             inertia_values = {}
 
             if inertia_element:
-                inertia_values = { k: approximate(float(v)) for k,v in inertia_element.node_.attributes.items() }
+                inertia_values = { k: approximate_integers(float(v)) for k,v in inertia_element.node_.attributes.items() }
 
             if mass_element:
-                mass = approximate(float(mass_element.attr('value', 0)), 1e-5)
+                mass = approximate_integers(float(mass_element.attr('value', 0)), 1e-5)
             else:
                 mass = 0
 
@@ -178,6 +180,14 @@ class URDFModel:
         # resulting LinkModel 
         self.model_ = LinkModel()
 
+        self.transform_element_ = lambda element, parent: element.to_sym_lm(parent)
+
+    def transform_elements(self, callback):
+        '''
+        Override the behavior of turning URDFElement into a Link object.
+        '''
+        self.transform_element_ = callback
+
     def model(self) -> LinkModel:
         return self.model_
 
@@ -193,8 +203,12 @@ class URDFModel:
         Add a link/joint froom the URDF and all of its children to the LinkModel.
         '''
 
-        # link will add itself to the model if passed a parent
-        link = element.as_sym_lm(parent)
+        # link will add itself to self.model_ if passed a parent
+
+        link = self.transform_element_(element, parent)
+
+        if link is None:
+            link = element.as_sym_lm(parent)
         
         if element.tag() == 'joint':
             child = element.child('child').attr('link')
