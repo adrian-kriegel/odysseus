@@ -1,6 +1,6 @@
 
 '''
-Helpers for building a sym_lm LinkModel from a URDF DOM.
+Helpers for building LinkModels from a URDF DOM.
 '''
 
 import numpy as np
@@ -18,7 +18,8 @@ from odysseus import \
     Link, \
     Segment, \
     Transform,\
-    inertia_matrix
+    inertia_matrix,\
+    JointLimits
 
 from odysseus.sym_util import approximate_integers
 
@@ -50,13 +51,21 @@ class URDFElement:
         self.node_ = node
 
     def child(self, name : str):
+        '''
+        Returns single immediate child as URDFElement.
+        Returns None if not found.
+        Raises Exception if not unique.
+        '''
 
-        node = self.node_.getElementsByTagName(name).item(0)
+        matches = [child for child in self.node_.getElementsByTagName(name) if child.parentNode == self.node_]
 
-        if node is None:
+        if len(matches) == 0:
             return None
-        else:
-            return URDFElement(node)
+
+        if len(matches) != 1:
+            raise Exception(f'Child {name} of {self.tag()} is not unique!')
+
+        return URDFElement(matches[0])
 
     def attr(self, name : str, fallback = None):
 
@@ -126,10 +135,27 @@ class URDFElement:
                 inertia
             )
 
+    def limits(self) -> JointLimits:
+
+        limits_element = self.child('limit')
+
+        if limits_element is None:
+            return JointLimits()
+        else:
+            return JointLimits(
+                float(limits_element.attr('lower', -np.inf)),
+                float(limits_element.attr('upper', np.inf)),
+                - float(limits_element.attr('velocity', np.inf)),
+                float(limits_element.attr('velocity', np.inf))
+            )
+
     def as_joint(self, parent : Link):
         '''
         Parse <joint> tag as Joint (w/ dof) or Link (w/o dof).
         '''
+
+        limits = self.limits()
+
         match self.attr('type'):
             case 'revolute':
                 return JointRevolute(
@@ -137,7 +163,8 @@ class URDFElement:
                     parent,
                     self.origin(),
                     URDFElement.parse_vector(self.child('axis').attr('xyz')),
-                    float(self.attr('damping', 0))
+                    float(self.attr('damping', 0)),
+                    limits=limits
                 )
             case 'fixed':
                 # a fixed joint is just a link
@@ -180,7 +207,7 @@ class URDFModel:
         # resulting LinkModel 
         self.model_ = LinkModel()
 
-        self.transform_element_ = lambda element, parent: element.to_sym_lm(parent)
+        self.transform_element_ = lambda element, parent: element.as_sym_lm(parent)
 
     def transform_elements(self, callback):
         '''
