@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from enum import Enum
 from typing import Self
-from collections.abc import Iterable
+
+import numpy as np
 
 from symengine import Symbol, symbols, Matrix, cos, sin, Function, eye, atan2, sqrt
 import symengine as se
@@ -55,6 +56,13 @@ class Transform:
         else:
             self.rot_ = eye(3) 
 
+    def inverse(self) -> Transform:
+        rt = self.rot_.transpose()
+        return Transform(
+            - rt*self.trans_,
+            rot=rt
+        )
+
     def chain(self, t : Self):
         '''
         Returns self * t.
@@ -101,13 +109,19 @@ class Transform:
         cy = cos(yaw)
         sy = sin(yaw)
 
-        rot =  Matrix([
-            [cp * cy, (sr * sp * cy) - (cr * sy), (cr * sp * cy) + (sr * sy)],
-            [cp * sy, (sr * sp * sy) + (cr * cy), (cr * sp * sy) - (sr * cy)],
-            [-sp, sr * cp, cr * cp]
+        return Matrix([
+            [cy, -sy, 0],
+            [sy, cy, 0],
+            [0,0,1]
+        ]) * Matrix([
+            [cp, 0, sp],
+            [0, 1, 0],
+            [-sp,0,cp]
+        ]) * Matrix([
+            [1, 0, 0],
+            [0, cr, -sr],
+            [0, sr, cr]
         ])
-
-        return rot
 
 class Link:
 
@@ -283,6 +297,15 @@ class JointFree(Joint):
     def damping_force(self):
         return Matrix([ 0 for q in self.q() ])
 
+class JointLimits:
+
+    def __init__(self, pos_l = -np.inf, pos_u = np.inf, vel_l = -np.inf, vel_u = np.inf):
+
+        self.pos_l_ = pos_l
+        self.pos_u_ = pos_u
+        self.vel_l_ = vel_l
+        self.vel_u_ = vel_u
+
 class JointRevolute(Joint):
 
     def __init__(
@@ -292,7 +315,8 @@ class JointRevolute(Joint):
         origin : Transform,
         axis : Matrix,
         damping = 0,
-        actuation : ActuationType = ActuationType.DIRECT
+        actuation : ActuationType = ActuationType.DIRECT,
+        limits : JointLimits = JointLimits()
     ):
         '''
         Keyword arguments:
@@ -311,6 +335,8 @@ class JointRevolute(Joint):
         self.origin_ = self.origin_ * Transform.from_axis_angle(self.axis_, self.q())
 
         self.damping_ = damping
+
+        self.limits_ = limits
 
     def damping_torque(self):
         '''
