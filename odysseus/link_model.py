@@ -274,11 +274,12 @@ class JointFree(Joint):
     def __init__(
         self,
         name : str,
+        parent,
         xyz : Matrix,
         rpy : Matrix,
         q : Matrix,
-        actuation : ActuationType,
-        model_or_parent : LinkModel | Link
+        actuation : ActuationType = ActuationType.DIRECT,
+        model : LinkModel | None = None
     ):
         '''
         Keyword arguments:
@@ -291,17 +292,7 @@ class JointFree(Joint):
 
         origin = Transform(xyz, rpy)
 
-        if isinstance(model_or_parent, Link):
-            parent = model_or_parent
-            model = None
-        else:
-            parent = None
-            model = model_or_parent
-
         Joint.__init__(self, name, parent, origin, actuation=actuation, model=model)
-
-        # we can override world_transform_ because JointFree has no parent
-        self.world_transform_ = origin
 
         self.q_ = q
 
@@ -529,7 +520,7 @@ class LinkModel:
             
             q = Matrix([ v for v in (list(xyz) + list(rpy)) if diff(v, 't') != 0 ])
             
-        return JointFree(name, xyz, rpy, q, actuation, model_or_parent=self)
+        return JointFree(name, None, xyz, rpy, q, actuation, model=self)
 
     def register(self, link : Link):
 
@@ -636,7 +627,7 @@ class LinkModel:
         '''
         Dynamics f(q_i,dq_i,ddq_i) such that f(q_i,dq_i,ddq_i) = Q_i for each joint where Q_i are generalized forces.
         '''
-        return Matrix(list(self.generate_dynamics()))
+        return Matrix(list(self.generate_dynamics(joints)))
 
     def canonical_dynamics(self, joints : list[Joint] | None = None):
         '''
@@ -659,11 +650,11 @@ class LinkModel:
 
         # rest of the dynamics
         rest_rows = []
-
+        
         for tau in self.generate_dynamics(joints):
 
             tau = approximate_integers(tau)
-
+            
             # we know that tau is linear in ddq
             mass = diff(tau, ddq)
 
