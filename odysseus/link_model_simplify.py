@@ -16,14 +16,13 @@ def merge_fixed_links(root : Link, tolerance = 1e-5) -> (se.Expr, se.Matrix, lis
     joints = []
 
     def predicate(link : Link):
-
-        if not isinstance(link, Joint):
-            return True
-        else:
+        if isinstance(link, Joint):
             joints.append(link)
             return False
+        else:
+            return True
 
-    parts = root.visit_as_long(predicate)
+    parts = visit_as_long(root, predicate)
 
     mass = 0
     inertia = se.zeros(3, 3)

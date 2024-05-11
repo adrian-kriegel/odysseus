@@ -158,6 +158,12 @@ class Link:
         # be allowed to change the structure of the model.
         self.world_transform_ : Transform | None = None
 
+        if self.parent_ is not None:
+            self.parent_.register_child(self)
+
+    def register_child(self, child : Link):
+        self.children_.append(child)
+
     def get_transform(self, to_name : str | None = None, from_name = None) -> Transform:
         '''
         Get the Transform from the node named from_name to to_name (=self.name_).
@@ -263,7 +269,7 @@ class Joint(Link):
 class JointFree(Joint):
     '''
     Joint moving freely according to its origins DOF.
-    This is the only joint that is not attached to a parent link.
+    This is the only joint that is not required to be attached to a parent link.
     '''
     def __init__(
         self,
@@ -272,7 +278,7 @@ class JointFree(Joint):
         rpy : Matrix,
         q : Matrix,
         actuation : ActuationType,
-        model : LikModel
+        model_or_parent : LinkModel | Link
     ):
         '''
         Keyword arguments:
@@ -285,7 +291,14 @@ class JointFree(Joint):
 
         origin = Transform(xyz, rpy)
 
-        Joint.__init__(self, name, None, origin, actuation=actuation, model=model)
+        if isinstance(model_or_parent, Link):
+            parent = model_or_parent
+            model = None
+        else:
+            parent = None
+            model = model_or_parent
+
+        Joint.__init__(self, name, parent, origin, actuation=actuation, model=model)
 
         # we can override world_transform_ because JointFree has no parent
         self.world_transform_ = origin
@@ -516,7 +529,7 @@ class LinkModel:
             
             q = Matrix([ v for v in (list(xyz) + list(rpy)) if diff(v, 't') != 0 ])
             
-        return JointFree(name, xyz, rpy, q, actuation, model=self)
+        return JointFree(name, xyz, rpy, q, actuation, model_or_parent=self)
 
     def register(self, link : Link):
 
