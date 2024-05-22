@@ -37,6 +37,10 @@ def to_casadi(expr : se.Expr, subs : dict):
 
     elif isinstance(expr, se.Pow):
         
+        # casadi's to_casadi(exp(x)) decays to (2.7...)^x otherwise
+        if expr.args[0] is se.E:
+            return ca.exp(to_casadi(expr.args[1], subs))
+
         return ca.power(to_casadi(expr.args[0], subs), to_casadi(expr.args[1], subs))
 
     elif isinstance(expr, se.Function):
@@ -56,6 +60,10 @@ def to_casadi(expr : se.Expr, subs : dict):
     elif expr is se.pi:
 
         return ca.pi
+
+    elif expr is se.E:
+
+        return ca.exp(1)
 
     
     raise Exception(f'Cannot convert expression of type {type(expr)} to casadi expression: \n{expr}')
