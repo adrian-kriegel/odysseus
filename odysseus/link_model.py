@@ -128,7 +128,7 @@ class Link:
     ''' 
     Represents any part of a Joint/Segment assembly.
     Each Link is attached to a parent Link (except for the root Link).
-    Each Link defines it's own coordinate system via self.origin_. This is the transformation from the parent's coordinate system to the Links own coordinate system.
+    Each Link defines its own coordinate system via self.origin_. This is the transformation from the parent's coordinate system to the Links own coordinate system.
     '''
 
     def __init__(
