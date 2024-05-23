@@ -1,15 +1,17 @@
 #!/bin/env python
 
 '''
-Derives the dynamics of the rrbot from the gazebo examples and outputs C code for Computed Torque Control (https://en.wikipedia.org/wiki/Computed_torque_control) which allows for exact linearization of any nonlinear mechatronic system.
+Derives the dynamics of the rrbot from the gazebo examples and outputs C code for Computed Torque Control (https://en.wikipedia.org/wiki/Computed_torque_control) which allows for exact linearization of nonlinear systems.
+
+The code generation is a bit messy because it uses sympy, whereas Odysseus uses symengine. I strongly recommend that you use casadi for code generation instead. See odysseus.symengine2casadi.
+
 '''
 
-from sympy import Symbol, cos, sin, diff, solve, latex, Matrix, simplify, collect, expand, factor, Equality, MatrixSymbol
-from sympy.core.function import Function
+from symengine import Symbol, Matrix, Function
+from sympy import Equality, MatrixSymbol, sympify, symbols
 from sympy.utilities.codegen import codegen
-import sympy as sp
 
-from odysseus import LinkModel, Segment, Link, JointRevolute, Transform, inertia_matrix
+from odysseus import diff, LinkModel, Segment, Link, JointRevolute, Transform, inertia_matrix
 
 # axle_offset is the pivot point relative to the end of each rod
 axle_offset = 0.05
@@ -60,9 +62,9 @@ tau = model.dynamics()
 
 ## substitute q(t) and derivatives for symbols representable as c variables
 
-param_q = sp.symbols('q:2')
-param_dq = sp.symbols('dq:2')
-param_ddq = sp.symbols('v:2')
+param_q = symbols('q0 q1')
+param_dq = symbols('dq0 dq1')
+param_ddq = symbols('ddq0 ddq1')
 
 q = [joint0.q(), joint1.q()]
 
@@ -71,16 +73,26 @@ t = Symbol('t')
 for i in range(0, len(q)):
 
     tau = tau\
-        .subs(diff(q[i], (t, 2)), param_ddq[i])\
+        .subs(diff(diff(q[i], t), t), param_ddq[i])\
         .subs(diff(q[i], t), param_dq[i])\
         .subs(q[i], param_q[i])
 
-M_G = Symbol('M_G')
-
-tau = tau.subs('g', M_G)
+tau = tau.subs('g', 9.81)
 
 outparam = MatrixSymbol('u_out', len(q), 1)
 
-((_, code), _) = codegen(('compute_torque', Equality(outparam, tau)), argument_sequence=(outparam, param_ddq[0], param_ddq[1], param_dq[0], param_dq[1], param_q[0], param_q[1]), global_vars=[M_G],language='C99')
+((_, code), _) = codegen(
+    ('compute_torque', Equality(outparam, sympify(tau))), 
+    argument_sequence=(
+        outparam, 
+        param_ddq[0], 
+        param_ddq[1], 
+        param_dq[0], 
+        param_dq[1], 
+        param_q[0], 
+        param_q[1]
+    ),
+    language='C99'
+)
 
 print(code)
