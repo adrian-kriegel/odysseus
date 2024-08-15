@@ -309,7 +309,7 @@ class JointFree(Joint):
 
         Joint.__init__(self, name, parent, origin, actuation=actuation, model=model)
 
-        if diff(q, 't').is_zero_matrix:
+        if q.rows > 0 and diff(q, 't').is_zero_matrix:
             raise Exception('q must be a function of time.')
 
         self.q_ = q
@@ -519,7 +519,7 @@ class LinkModel:
         name : str = 'root',
         xyz = Matrix(symbols('x y z')),
         rpy = Matrix(symbols('rx ry rz')),
-        q = None,
+        q : Matrix | None = None,
         actuation : ActuationType = ActuationType.FREE
     ) -> Self:
         '''
