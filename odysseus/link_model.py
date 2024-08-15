@@ -266,6 +266,18 @@ class Joint(Link):
         '''
         raise NotImplemented()
 
+class JointLimits:
+
+    def __init__(self, pos_l = None, pos_u = None, vel_l = None, vel_u = None, idx_q : list[int] = []):
+
+        self.pos_l_ = pos_l
+        self.pos_u_ = pos_u
+        self.vel_l_ = vel_l
+        self.vel_u_ = vel_u
+
+        # Indices of q that are affected by the limits
+        self.idx_q_ = []
+
 class JointFree(Joint):
     '''
     Joint moving freely according to its origins DOF.
@@ -279,7 +291,8 @@ class JointFree(Joint):
         rpy : Matrix,
         q : Matrix,
         actuation : ActuationType = ActuationType.DIRECT,
-        model : LinkModel | None = None
+        model : LinkModel | None = None,
+        limits : JointLimits | None = None
     ):
         '''
         Keyword arguments:
@@ -289,6 +302,8 @@ class JointFree(Joint):
         q           -- Degrees of freedom in xyz/rpy.
         model       -- LinkModel.
         '''
+
+        self.limits_ = limits
 
         origin = Transform(xyz, rpy)
 
@@ -301,14 +316,6 @@ class JointFree(Joint):
     def damping_force(self):
         return Matrix([ 0 for q in self.q() ])
 
-class JointLimits:
-
-    def __init__(self, pos_l = -np.inf, pos_u = np.inf, vel_l = -np.inf, vel_u = np.inf):
-
-        self.pos_l_ = pos_l
-        self.pos_u_ = pos_u
-        self.vel_l_ = vel_l
-        self.vel_u_ = vel_u
 
 class JointRevolute(Joint):
 
