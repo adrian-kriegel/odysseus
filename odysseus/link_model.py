@@ -309,6 +309,9 @@ class JointFree(Joint):
 
         Joint.__init__(self, name, parent, origin, actuation=actuation, model=model)
 
+        if diff(q, 't').is_zero_matrix:
+            raise Exception('q must be a function of time.')
+
         self.q_ = q
 
         self.dof_ = len(q)
