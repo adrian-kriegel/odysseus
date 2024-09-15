@@ -157,6 +157,7 @@ class URDFElement:
         limits = self.limits()
 
         match self.attr('type'):
+            # A hinge joint that rotates along the axis and has a limited range specified by the upper and lower limits. 
             case 'revolute':
                 return JointRevolute(
                     self.attr('name'),
@@ -166,6 +167,16 @@ class URDFElement:
                     float(self.attr('damping', 0)),
                     limits=limits
                 )
+            # A continuous hinge joint that rotates around the axis and has no upper and lower limits. 
+            case 'continuous':
+                return JointRevolute(
+                    self.attr('name'),
+                    parent,
+                    self.origin(),
+                    URDFElement.parse_vector(self.child('axis').attr('xyz')),
+                    float(self.attr('damping', 0))
+                )
+            # This is not really a joint because it cannot move. 
             case 'fixed':
                 # a fixed joint is just a link
                 return Link(
