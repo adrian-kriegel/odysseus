@@ -206,6 +206,9 @@ class Link:
             omega[1,0]
         ])
 
+    def name(self):
+        return self.name_
+
 class ActuationType(Enum):
     '''
     Describes how/if a joint might be actuated.
