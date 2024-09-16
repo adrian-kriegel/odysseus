@@ -5,7 +5,7 @@ Loads a URDF file and creates a shared library for computing the dynamics of the
 
 This library can then be loaded by a controller to implement efficient exact linearization via state feedback.
 
-You can pipe a URDF into this script followed by the name of the based link of the robot and the path to the shared library to generate.
+You can pipe a URDF into this script followed by the name of the base link of the robot and the path to the shared library to generate.
 
 For example:
 
