@@ -49,3 +49,9 @@ coverage.xml
 
 # Sphinx documentation
 docs/_build/
+
+# devenv 
+.devenv/
+
+# misc
+.ignore 

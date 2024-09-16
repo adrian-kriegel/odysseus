@@ -1,0 +1,2 @@
+# source this file to enter the devenv
+nix develop --impure -c $SHELL
