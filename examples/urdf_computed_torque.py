@@ -202,7 +202,7 @@ def run_command(cmd):
 
 run_command(f'gcc -Ofast -c -fPIC {cfile} -o {funcname}.o')
 run_command(f'g++ -c -fPIC metadata.cpp -o metadata.o')
-run_command(f'gcc -shared -o {lib_file} {funcname}.o metadata.o')
+run_command(f'g++ -shared -o {lib_file} {funcname}.o metadata.o -lstdc++')
 
 print('Generated shared library: ', lib_file)
 
