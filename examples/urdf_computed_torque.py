@@ -21,6 +21,8 @@ import sys
 
 import os
 
+import subprocess
+
 import tempfile
 
 import xml.dom.minidom as xml
@@ -192,9 +194,15 @@ with open(os.path.join(tempdir, 'metadata.cpp'), 'w') as f:
   f.write(metadata_code)
 
 print('Compiling...')
-assert os.system(f'gcc -Ofast -c -fPIC {cfile} -o {funcname}.o') == 0
-assert os.system(f'g++ -c -fPIC metadata.cpp -o metadata.o') == 0
-assert os.system(f'gcc -shared -o {lib_file} {funcname}.o metadata.o') == 0
+
+def run_command(cmd):
+  print(cmd)
+  result = subprocess.run(cmd.split(' '), capture_output=True)
+  result.check_returncode()
+
+run_command(f'gcc -Ofast -c -fPIC {cfile} -o {funcname}.o')
+run_command(f'g++ -c -fPIC metadata.cpp -o metadata.o')
+run_command(f'gcc -shared -o {lib_file} {funcname}.o metadata.o')
 
 print('Generated shared library: ', lib_file)
 
