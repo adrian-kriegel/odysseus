@@ -110,6 +110,7 @@ class URDFElement:
         else:
             inertia_element = inertial.child('inertia')
             mass_element = inertial.child('mass')
+            origin_element = inertial.child('origin')
 
             inertia_values = {}
 
@@ -120,6 +121,16 @@ class URDFElement:
                 mass = approximate_integers(float(mass_element.attr('value', 0)), 1e-5)
             else:
                 mass = 0
+
+            inertial_origin = Matrix([0,0,0])
+
+            if origin_element:
+                rpy = URDFElement.parse_vector(origin_element.attr('rpy'))
+
+                if rpy != Matrix([0,0,0]):
+                    raise Exception('Rotation of inertial origin not supported.')
+
+                inertial_origin = URDFElement.parse_vector(origin_element.attr('xyz'))
 
             inertia = inertia_matrix(**inertia_values)
 
@@ -132,7 +143,8 @@ class URDFElement:
                 parent, 
                 self.origin(), 
                 mass,
-                inertia
+                inertia,
+                inertial_origin
             )
 
     def limits(self) -> JointLimits:
@@ -164,7 +176,7 @@ class URDFElement:
                     parent,
                     self.origin(),
                     URDFElement.parse_vector(self.child('axis').attr('xyz')),
-                    float(self.attr('damping', 0)),
+                    self.get_damping(),
                     limits=limits
                 )
             # A continuous hinge joint that rotates around the axis and has no upper and lower limits. 
@@ -174,7 +186,7 @@ class URDFElement:
                     parent,
                     self.origin(),
                     URDFElement.parse_vector(self.child('axis').attr('xyz')),
-                    float(self.attr('damping', 0))
+                    self.get_damping()
                 )
             # This is not really a joint because it cannot move. 
             case 'fixed':
@@ -186,6 +198,15 @@ class URDFElement:
                 )
             case joint_type:
                 raise Exception(f'Unsupported joint type: {joint_type}.')
+
+    def get_damping(self):
+
+        dynamics = self.child('dynamics')
+
+        if dynamics is not None:
+            return float(dynamics.attr('damping', 0))
+
+        return 0
 
     @staticmethod 
     def parse_vector(v : str | None, map_func=approximate) -> Matrix:

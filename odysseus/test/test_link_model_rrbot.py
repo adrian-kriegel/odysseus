@@ -64,8 +64,12 @@ def test_rrbot():
     assert x0 == x + sin(joint0.q_) * l0/2
     assert z0 == z + cos(joint0.q_) * l0/2
 
-    assert_eq(x1, x + sin(joint0.q_) * l0 + sin(joint0.q_ + joint1.q_) * l1/2)
-    assert_eq(z1, z + cos(joint0.q_) * l0 + cos(joint0.q_ + joint1.q_) * l1/2)
+    # TODO: assert_eq does not make use of added angle identity:
+    # sin(a+b) = sin(a)*cos(b) + sin(b)*cos(a)
+    # rhs could be written more compactly: 
+    # x + sin(joint0.q_) * l0 + sin(joint0.q_ + joint1.q_) * l1/2
+    assert_eq(x1, x + 0.5*(sin(joint0.q())*cos(joint1.q()) + sin(joint1.q())*cos(joint0.q())) + 0.9*sin(joint0.q()))
+    assert_eq(z1, z + 0.5*(-sin(joint0.q())*sin(joint1.q()) + cos(joint0.q())*cos(joint1.q())) + 0.9*cos(joint0.q()))
 
     assert_eq(segment0.v_rot(), Matrix([0, diff(joint0.q_, 't'), 0]))
     assert_eq(segment1.v_rot(), Matrix([0, diff(joint0.q_ + joint1.q_, 't'), 0]))

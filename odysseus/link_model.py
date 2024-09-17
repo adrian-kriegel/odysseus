@@ -93,6 +93,10 @@ class Transform:
 
     @staticmethod
     def from_axis_angle(axis : Matrix, angle):
+        
+        x,y,z = abs(axis[0]), abs(axis[1]), abs(axis[2])
+
+        assert (x,y,z) == (1,0,0) or (x,y,z) == (0,1,0) or (x,y,z) == (0,0,1)
 
         return Transform(Matrix([0, 0, 0]), axis*angle)
 
@@ -198,7 +202,7 @@ class Link:
         '''
         r = self.get_transform().rot_
 
-        omega = diff(r, 't') * r.transpose()
+        omega = r.transpose() * diff(r, 't')
 
         return Matrix([
             omega[2,1],
@@ -666,7 +670,7 @@ class LinkModel:
         
         for tau in self.generate_dynamics(joints):
 
-            tau = approximate_integers(tau)
+            # tau = approximate_integers(tau)
             
             # we know that tau is linear in ddq
             mass = diff(tau, ddq)
@@ -674,7 +678,7 @@ class LinkModel:
             mass_rows.append(mass)
 
             # again, using linearity of tau in ddq 
-            rest = approximate_integers(tau.subs({ v: 0 for v in ddq}))
+            rest = tau.subs({ v: 0 for v in ddq})
 
             rest_rows.append(rest)
 

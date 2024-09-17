@@ -4,5 +4,5 @@ import sympy as sp
 
 def assert_eq(a, b):
 
-    assert sp.simplify(sp.trigsimp(a)) == sp.simplify(sp.trigsimp(a))
+    assert sp.simplify(sp.trigsimp(a)) == sp.simplify(sp.trigsimp(b))
 
