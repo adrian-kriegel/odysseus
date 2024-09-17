@@ -32,7 +32,7 @@
                 {
                   languages.python = {
                     enable = true;
-                    package = pkgs.python311;
+                    package = pkgs.python312;
                     venv = {
                       enable = true;
                       requirements = ''
@@ -46,7 +46,7 @@
                   };
 
                   packages = [ 
-                    pkgs.hello
+                    pkgs.gcc
                     
                   ];
 
