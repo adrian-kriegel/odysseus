@@ -28,17 +28,17 @@ def find_by_attr(node, tag_name : str, attr : str, value : str):
     return (e for e in node.getElementsByTagName(tag_name) if e.getAttribute(attr) == value)
 
 
-def approximate(x : float, tolerance=1e-4):
+def approximate(x : float, tolerance=1e-6):
     '''
     Approximates x as a rational number.
     '''
     return se.sympify(sp.nsimplify(x, rational=True, tolerance=tolerance))
 
-def approximate_angle(x : float, accuracy=1e-4):
+def approximate_angle(x : float, accuracy=1e-5):
     '''
     Approximates x as a rational multiple of pi.
     '''
-    return approximate(x / np.pi * se.pi)
+    return approximate(x / np.pi * se.pi, accuracy)
 
 class URDFElement:
     '''
@@ -83,7 +83,7 @@ class URDFElement:
 
         return Transform() if origin is None else Transform(
             URDFElement.parse_vector(origin.attr('xyz'), lambda x: x), 
-            URDFElement.parse_vector(origin.attr('rpy'), approximate_angle)
+            URDFElement.parse_rotation(origin.attr('rpy'))
         )
 
     def as_sym_lm(self, parent : Link):
@@ -118,14 +118,14 @@ class URDFElement:
                 inertia_values = { k: approximate_integers(float(v)) for k,v in inertia_element.node_.attributes.items() }
 
             if mass_element:
-                mass = approximate_integers(float(mass_element.attr('value', 0)), 1e-5)
+                mass = approximate_integers(float(mass_element.attr('value', 0)), 1e-6)
             else:
                 mass = 0
 
             inertial_origin = Matrix([0,0,0])
 
             if origin_element:
-                rpy = URDFElement.parse_vector(origin_element.attr('rpy'))
+                rpy = URDFElement.parse_rotation(origin_element.attr('rpy'))
 
                 if rpy != Matrix([0,0,0]):
                     raise Exception('Rotation of inertial origin not supported.')
@@ -175,7 +175,7 @@ class URDFElement:
                     self.attr('name'),
                     parent,
                     self.origin(),
-                    URDFElement.parse_vector(self.child('axis').attr('xyz')),
+                    self.axis(),
                     self.get_damping(),
                     limits=limits
                 )
@@ -185,7 +185,7 @@ class URDFElement:
                     self.attr('name'),
                     parent,
                     self.origin(),
-                    URDFElement.parse_vector(self.child('axis').attr('xyz')),
+                    self.axis(),
                     self.get_damping()
                 )
             # This is not really a joint because it cannot move. 
@@ -208,8 +208,20 @@ class URDFElement:
 
         return 0
 
+    def axis(self):
+
+        axis = URDFElement.parse_vector(self.child('axis').attr('xyz'))
+
+        axis_approx = np.array([int(approximate(x, 1e-1)) for x in axis])
+
+        if np.linalg.norm(axis_approx - [float(x) for x in axis]) > 1e-6:
+            raise Exception(f'Axis {axis} is not a unit vector.')
+        
+        return axis_approx
+
+
     @staticmethod 
-    def parse_vector(v : str | None, map_func=approximate) -> Matrix:
+    def parse_vector(v : str | None, map_func=lambda x: x) -> Matrix:
         ''' 
         Parse a 3D vector formatted as a space separated string.
         Returns zero-vector if v is None.
@@ -219,6 +231,11 @@ class URDFElement:
             return Matrix([map_func(float(val)) for val in v.split(' ')])
         else:
             return Matrix([0,0,0])
+
+    @staticmethod
+    def parse_rotation(v : str | None) -> Matrix:
+
+        return URDFElement.parse_vector(v, approximate_angle)
 
 class URDFModel:
     '''
