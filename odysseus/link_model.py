@@ -601,7 +601,7 @@ class LinkModel:
 
         # helper for dynamics per coordinate
         def dynamics_helper(q, damping_forces):
-            return diff(diff(L, diff(q, t), foreach=True), t) - diff(L, q, foreach=True) - damping_forces
+            return diff(diff(L, diff(q, t), foreach=True), t) - diff(L, q, foreach=True) + damping_forces
 
         for joint in joints:
             q = joint.q()
