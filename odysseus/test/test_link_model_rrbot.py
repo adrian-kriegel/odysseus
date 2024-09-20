@@ -114,7 +114,7 @@ def test_rrbot():
 
     assert_eq(model.lagrangian(), L)
 
-    damping_torques = Matrix([d0*dq0, d1*dq1])
+    damping_torques = Matrix([-d0*dq0, -d1*dq1])
 
     q = Matrix([joint0.q(), joint1.q()])
     dq = diff(q, t)
