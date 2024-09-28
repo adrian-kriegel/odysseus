@@ -34,17 +34,7 @@ from symengine import Matrix, Symbol
 from odysseus import diff, URDFModel
 from odysseus.symengine2casadi import to_casadi
 
-# Read urdf from stdin (this just makes it easier to pipe output from xacro into this script).
-doc = xml.parseString(sys.stdin.read())
-
-# Read base link name from command args.
-base_link_name = sys.argv[1]
-
-# Create a model from the URDF.
-urdf = URDFModel(doc)
-
-def get_robot_name():
-  return urdf.dom_.getElementsByTagName('robot')[0].getAttribute('name')
+from odysseus.examples.model_from_args import urdf, base_link_name, get_robot_name
 
 # Where to write the shared library to.
 lib_file = len(sys.argv) > 2 and sys.argv[2] or os.path.abspath(f'./{get_robot_name()}_ct_library.so')
