@@ -11,6 +11,7 @@ sympy = "^1.13.3"
 symengine = "^0.11.0"
 casadi = "^3.6.6"
 pytest = "^8.3.3"
+acados-template = {path = "submodules/acados/interfaces/acados_template"}
 
 
 [build-system]
