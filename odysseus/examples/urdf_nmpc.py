@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 '''
+Disclaimer: This is a WIP. I haven't verified the resulting OCP solver yet.
+
 Loads a URDF file and generates an NMPC solver for inverse dynamics control.
 
 The resulting controller assumes that the dynamics of the actuated joints are decoupled and linear.
@@ -171,16 +173,14 @@ ocp.solver_options.integrator_type = 'ERK'
 ocp.solver_options.qp_solver_cond_N = 5  # Condensing steps
 ocp.solver_options.nlp_solver_type = 'SQP_RTI'
 
-
-
 #
 # Code generation.
 #
 
-tempdir = '.acados_generated'
+tempdir = tempfile.mkdtemp()
 code_dir = os.path.join(tempdir, model.name)
-#os.chdir(tempdir)
-#os.makedirs(code_dir, exist_ok=True)
+os.chdir(tempdir)
+os.makedirs(code_dir, exist_ok=True)
 
 ocp.code_export_directory = code_dir
 
