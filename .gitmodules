@@ -1,3 +1,6 @@
 [submodule "odysseus/test/res/anymal_d_simple_description"]
 	path = odysseus/test/res/anymal_d_simple_description
 	url = https://github.com/ANYbotics/anymal_d_simple_description/
+[submodule "submodules/acados"]
+	path = submodules/acados
+	url = https://github.com/acados/acados.git
