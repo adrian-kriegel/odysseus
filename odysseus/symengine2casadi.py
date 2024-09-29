@@ -67,3 +67,51 @@ def to_casadi(expr : se.Expr, subs : dict):
 
     
     raise Exception(f'Cannot convert expression of type {type(expr)} to casadi expression: \n{expr}')
+
+
+class SymEngineToCasADiConverter:
+    '''
+    Helper class for converting symengine expressions to CasADi expressions.
+    '''
+
+    def __init__(self, subs : list[tuple[se.Expr, ca.MX]]):
+        '''
+        Arguments:
+            subs: A list of tuples of the form (symengine expression, casadi expression).
+        '''
+
+        self.subs_dict_ = {}
+
+        for se_expr, ca_expr in subs:
+
+            ca_columns = ca_expr.columns() if isinstance(ca_expr, ca.MX) else 1
+            ca_rows = ca_expr.rows() if isinstance(ca_expr, ca.MX) else 1
+            se_rows = len(se_expr) if isinstance(se_expr, se.Matrix) else 1
+
+            if ca_columns != 1:
+                print(ca_expr.rows)
+                raise Exception(f'Matrix substitution is not supported: {se_expr} -> {ca_expr}.')
+
+
+            if ca_rows != se_rows:
+                raise Exception(f'Mismatch in dimensions of {se_expr} ({se_rows} rows) and {ca_expr} ({ca_rows} rows).')
+
+            # Substitute scalar expressions.
+            if ca_rows == 1:
+                self.subs_dict_[se_expr] = ca_expr
+                continue
+
+            # Substitute vector expressions.
+            for se_subexpr, ca_subexpr in zip(se_expr, ca.vertsplit(ca_expr, 1)):
+
+                if se_subexpr is se_expr:
+                    raise Exception(f'Found duplicate substitution for {se_expr} in {subs}.')
+
+                self.subs_dict_[se_subexpr] = ca_subexpr
+
+    def __call__(self, expr : se.Expr):
+        '''
+        Converts symengine expression(s) into casadi expression(s).
+        '''
+
+        return to_casadi(expr, self.subs_dict_)
