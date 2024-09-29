@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "odysseus"
+version = "0.1.0"
+description = ""
+authors = ["Adrian Kriegel <23387365+adrian-kriegel@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+sympy = "^1.13.3"
+symengine = "^0.11.0"
+casadi = "^3.6.6"
+pytest = "^8.3.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry.scripts]
+odysseus-ct = "odysseus.examples.urdf_computed_torque:main"
+odysseus-nmpc = "odysseus.examples.urdf_nmpc:main"
