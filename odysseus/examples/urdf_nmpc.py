@@ -37,12 +37,13 @@ from acados_template import AcadosOcp, AcadosOcpSolver, AcadosModel
 from acados_template.builders import CMakeBuilder
 
 from odysseus.examples.model_from_args import urdf, get_robot_name, base_link_name
+from odysseus.examples.inject_metadata import create_metadata_getter, create_metadata_file
 
 # TODO: read from inputs
 end_effector_names = ['camera_link']
 joints_actuated_names = ['joint1', 'joint2']
-horizon = 0.25
-num_shooting_intervals = 5
+horizon = 1.0
+num_shooting_intervals = 10
 
 robot_name = get_robot_name()
 
@@ -69,17 +70,24 @@ urdf.add_element_by_name(
 
 end_effectors = [robot.find(name) for name in end_effector_names]
 joints_actuated = [robot.find_joint(name) for name in joints_actuated_names]
+joints_free = []
+joints = joints_actuated + joints_free
 
 q = robot.q(joints_actuated)
 dq = diff(q, 't')
 
 end_effector_poses = [
-    link.get_transform() for link in end_effectors
+  link.get_transform() for link in end_effectors
 ]
 
 end_effector_positions = [
-    transform.trans_ for transform in end_effector_poses
+  transform.trans_ for transform in end_effector_poses
 ]
+
+def forward_end_effector_positions(qv):
+  return [pos.subs({ qi: v for qi, v in zip(q, qv) }) for pos in end_effector_positions]
+
+print(forward_end_effector_positions([1.54773, 1.0285]))
 
 # Introduce CasADi variables for converting the model in the next step.
 
@@ -119,7 +127,8 @@ model = AcadosModel()
 model.name = f'model_{robot_name}'
 
 # State vector (ddq becomes part of  the state because we model the system as being jerk-controlled).
-model.x = ca.vertcat(ca_q, ca_dq, ca_ddq)
+ca_state = ca.vertcat(ca_q, ca_dq, ca_ddq)
+model.x = ca_state
 
 # TODO: is there a special Linear ODE model in ACADOS?
 # Simple integrator chain.
@@ -144,33 +153,91 @@ nu = model.u.rows()
 ocp.solver_options.tf = horizon
 ocp.dims.N = num_shooting_intervals
 
-# TODO: This should be 'LINEAR_LS'
+
+#
+# Path cost.
+#
+
 ocp.cost.cost_type = 'NONLINEAR_LS'
-ocp.model.cost_y_expr = ca_end_effector_positions_joined
+
+ocp.model.cost_y_expr = ca.vertcat(
+  ca_u, # Penalize high jerk
+  ca_ddq, # Penalize high acceleration (approximately penalize hight torque)
+  ca_end_effector_positions_joined
+)
 
 # Weight matrix *can* be changed at run-time.
-ocp.cost.W = np.identity(ocp.model.cost_y_expr.rows())
+ocp.cost.W = np.diag(
+  # Jerk penalty.
+  [0.005]*num_joints +
+  # Acceleration penalty.
+  [0.005]*num_joints +
+  # Position error penalty.
+  [1.0]*ca_end_effector_positions_joined.rows()
+)
 
 # Reference output (populated at run-time).
 ocp.cost.yref = np.zeros(ocp.model.cost_y_expr.rows())
 
 #
+# Terminal cost.
+#
+
+ocp.cost.cost_type_e = 'NONLINEAR_LS'
+
+ocp.model.cost_y_expr_e = ca_end_effector_positions_joined
+
+ocp.cost.W_e = np.identity(ocp.model.cost_y_expr_e.rows())
+
+ocp.cost.yref_e = 3.0 * np.zeros(ocp.model.cost_y_expr_e.rows())
+
+#
 # Constraints 
 #
 
-ocp.constraints.lbx = np.array([j.limits_.pos_l_ for j in joints_actuated] + [j.limits_.vel_l_ for j in joints_actuated])
-ocp.constraints.ubx = np.array([j.limits_.pos_u_ for j in joints_actuated] + [j.limits_.vel_u_ for j in joints_actuated])
-# TODO: Constrain the acceleration! 
-ocp.constraints.idxbx = np.arange(len(joints_actuated)*2)
+# Constraints on the joints after t0.
 
-# TODO: Constraint the jerk!
+# Acceleration is penalized in the cost anyway, so ~10 G as an upper bound is probably reasonable.
+ddq_max = 100
+# I have trouble imagining jerk values. A jerk of 20 m/s³ is apparently at the lower end of a car braking abruptly.
+# We penalize high jerk anyway, so we can use a moderately high value for the constraint.
+dddq_max = 20
+
+# The joints don't have limits but it makes sense to constrain them to sensible ranges.
+# This helps the solver by confining the search space.
+q_min = - 2.0 * np.pi
+q_max = 2.0 * np.pi
+dq_max = 100
+
+for joint in joints:
+  if joint.limits_.pos_l_ == None:
+    joint.limits_.pos_l_ = q_min
+  if joint.limits_.pos_u_ == None:
+    joint.limits_.pos_u_ = q_max
+  if joint.limits_.vel_l_ == None:
+    joint.limits_.vel_l_ = -dq_max
+  if joint.limits_.vel_u_ == None:
+    joint.limits_.vel_u_ = dq_max
+
+ocp.constraints.lbx = np.array([j.limits_.pos_l_ for j in joints] + [j.limits_.vel_l_ for j in joints] + [-ddq_max]*len(joints))
+ocp.constraints.ubx = np.array([j.limits_.pos_u_ for j in joints] + [j.limits_.vel_u_ for j in joints] + [ddq_max]*len(joints))
+ocp.constraints.idxbx = np.arange(nx)
+
+ocp.constraints.lbu = np.array([-dddq_max]*nu)
+ocp.constraints.ubu = np.array([dddq_max]*nu)
+ocp.constraints.idxbu = np.arange(nu)
+
+# Initial state constraint. Populated at run-time.
+ocp.constraints.lbx_0 = np.zeros(nx)
+ocp.constraints.ubx_0 = np.zeros(nx)
+ocp.constraints.idxbx_0 = np.arange(nx)
 
 #
 # Solver setup.
 #
 
 ocp.solver_options.integrator_type = 'ERK'
-ocp.solver_options.qp_solver_cond_N = 5  # Condensing steps
+ocp.solver_options.qp_solver_cond_N = 1  # Condensing steps
 ocp.solver_options.nlp_solver_type = 'SQP_RTI'
 
 #
@@ -179,7 +246,11 @@ ocp.solver_options.nlp_solver_type = 'SQP_RTI'
 
 tempdir = tempfile.mkdtemp()
 code_dir = os.path.join(tempdir, model.name)
+
+print('Generating code in', code_dir)
+
 os.chdir(tempdir)
+
 os.makedirs(code_dir, exist_ok=True)
 
 ocp.code_export_directory = code_dir
@@ -187,17 +258,103 @@ ocp.code_export_directory = code_dir
 builder = CMakeBuilder()
 
 builder.options_on = [
-  'BUILD_ACADOS_SOLVER_LIB',
+  'BUILD_ACADOS_OCP_SOLVER_LIB',
 ]
 
 builder.options_off = [
   'BUILD_EXAMPLE'
 ]
 
-ocp_solver = AcadosOcpSolver(
-  ocp, 
-  json_file='acados_ocp.json', 
-  build=True,
-  generate=True,
-  cmake_builder=builder
+#
+# Generate CMakeLists.txt and source code but don't build the shared library just yet.
+#
+
+try:
+  ocp_solver = AcadosOcpSolver(
+    ocp, 
+    json_file='acados_ocp.json', 
+    build=False,
+    generate=True,
+    cmake_builder=builder
+  )
+
+# ACADOS is a bit of a special child. It tries to load the shared library which we have told it to NOT generate...
+except OSError as e:
+  if not 'cannot open shared object file: No such file or directory' in str(e):
+    raise e from None
+
+#
+# We now apply some patches to the generated code to inject metadata about the controller.
+#
+
+# Patch CMakeLists.txt
+with open(os.path.join(code_dir, 'CMakeLists.txt'), 'r+') as f:
+  cmakelists = f.read()
+
+  # TODO: this heavily depends on things like formatting and the ACADOS version. 
+  # It would be better to parse the CMakeLists.txt
+  add_library_line = r"add_library(${LIB_ACADOS_OCP_SOLVER} SHARED $<TARGET_OBJECTS:${MODEL_OBJ}> $<TARGET_OBJECTS:${OCP_OBJ}>)"
+
+  add_library_line_patched = r"add_library(${LIB_ACADOS_OCP_SOLVER} SHARED $<TARGET_OBJECTS:${MODEL_OBJ}> $<TARGET_OBJECTS:${OCP_OBJ}> controller_metadata.cpp)"
+
+  if not add_library_line in cmakelists:
+
+    raise Exception('Failed to patch CMakeLists.txt!')
+
+  f.seek(0)
+  f.write(cmakelists.replace(add_library_line, add_library_line_patched))
+
+# Generate the metadata source file
+
+# The order of the state interfaces needs to match the order in which they appear in the state vector.
+state_interfaces = [
+  joint.name() + '/position' for joint in joints
+] + [
+  joint.name() + '/velocity' for joint in joints
+] + [
+  joint.name() + '/acceleration' for joint in joints
+]
+
+command_interfaces = [
+  joint.name() + '/position' for joint in joints
+] + [
+  joint.name() + '/velocity' for joint in joints
+] + [
+  joint.name() + '/acceleration' for joint in joints
+]
+
+reference_interfaces = [
+  f'{link.name()}/position/{coord}' 
+  for link in end_effectors 
+  for coord in ['x', 'y', 'z'] 
+]
+
+print(reference_interfaces)
+
+get_controller_metadata = create_metadata_getter(
+  'get_controller_metadata', 
+  {
+    'joints': [joint.name() for joint in joints],
+    'joints_actuated': [joint.name() for joint in joints_actuated],
+    'joints_free': [joint.name() for joint in joints_free],
+    'state_interfaces': state_interfaces,
+    'command_interfaces': command_interfaces,
+    'reference_interfaces': reference_interfaces
+  }
 )
+
+get_acados_prefix = f'''
+const char* get_acados_prefix() {{
+  return "{model.name}"; 
+}}
+'''
+
+metadata_code = create_metadata_file([get_controller_metadata, get_acados_prefix])
+
+with open(os.path.join(code_dir, 'controller_metadata.cpp'), 'w') as f:
+
+  f.write(metadata_code)
+
+metadata_code = create_metadata_file([get_controller_metadata])
+
+builder.exec(code_dir)
