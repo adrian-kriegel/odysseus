@@ -33,6 +33,7 @@ from odysseus import diff
 from odysseus.symengine2casadi import SymEngineToCasADiConverter
 
 from odysseus.examples.model_from_args import urdf, base_link_name, get_robot_name
+from odysseus.examples.inject_metadata import create_metadata_getter, create_metadata_file
 
 def main():
 
@@ -141,43 +142,19 @@ def main():
 
   print('Generated source file: ', os.path.join(tempdir, cfile))
 
-  # Add metadata to the library.
-  def to_cpp_initializer_list(l):
+  # Prepare metadata to inject into the generated library.
+  get_controller_metadata = create_metadata_getter(
+    'get_controller_metadata', 
+    {
+      'joints': [joint.name() for joint in joints],
+      'joints_actuated': [joint.name() for joint in joints_actuated],
+      'joints_free': [joint.name() for joint in joints_free],
+      'state_interfaces': state_interfaces,
+      'command_interfaces': command_interfaces,
+    }
+  )
 
-    return ', '.join([f'"{x}"' for x in l])
-
-  metadata_code = f'''
-  #include <string>
-  #include <vector>
-
-  extern "C" {{
-
-  void get_controller_metadata(
-    std::vector<std::string>& joints,
-    std::vector<std::string>& joints_actuated,
-    std::vector<std::string>& joints_free,
-    std::vector<std::string>& state_interfaces,
-    std::vector<std::string>& command_interfaces
-  ){{
-    joints = {{
-      {to_cpp_initializer_list([joint.name() for joint in joints])}
-    }};
-    joints_actuated = {{
-      {to_cpp_initializer_list([joint.name() for joint in joints_actuated])}
-    }};
-    joints_free = {{
-      {to_cpp_initializer_list([joint.name() for joint in joints_free])}  
-    }};
-    state_interfaces = {{
-      {to_cpp_initializer_list(state_interfaces)}
-    }};
-    command_interfaces = {{
-      {to_cpp_initializer_list(command_interfaces)} 
-    }};
-  }}
-
-  }}
-  '''
+  metadata_code = create_metadata_file([get_controller_metadata])
 
   with open(os.path.join(tempdir, 'metadata.cpp'), 'w') as f:
     f.write(metadata_code)
