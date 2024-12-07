@@ -8,14 +8,6 @@ Loads a URDF file and generates an NMPC solver for inverse dynamics control.
 The resulting controller assumes that the dynamics of the actuated joints are decoupled and linear.
 This can be achieved by chaining a computed torque controller (see urdf_computed_torque.py) behind the NMPC controller.
 
-The NMPC model assumes that the system is jerk-controlled, though the jerk is never passed to any lower-level controller. 
-It is merely used to ensure that the resulting trajectory is three-times differentiable, which means that it can be exactly
-followed via the [PID -> CT] stack.
-
-Alternatively, we could model the acceleration as the input if we modelled the dynamics of the PID controller. 
-This would probably lead to issues with the solver "taking advantage" of the oscillations (especially towards
-the end of the horizon) if the cost function is not carefully chosen.
-
 '''
 
 import sys
@@ -42,8 +34,8 @@ from odysseus.examples.inject_metadata import create_metadata_getter, create_met
 # TODO: read from inputs
 end_effector_names = ['camera_link']
 joints_actuated_names = ['joint1', 'joint2']
-horizon = 1.0
-num_shooting_intervals = 10
+horizon = 0.25
+num_shooting_intervals = 5
 
 robot_name = get_robot_name()
 
@@ -84,10 +76,10 @@ end_effector_positions = [
   transform.trans_ for transform in end_effector_poses
 ]
 
-def forward_end_effector_positions(qv):
+def eval_end_effector_positions(qv):
+  ''' Quick helper for debugging. Returns end effector positions in world coordinates for values of q. '''
   return [pos.subs({ qi: v for qi, v in zip(q, qv) }) for pos in end_effector_positions]
 
-print(forward_end_effector_positions([1.54773, 1.0285]))
 
 # Introduce CasADi variables for converting the model in the next step.
 
@@ -100,9 +92,6 @@ ca_q = ca.MX.sym('q', num_joints)
 ca_dq = ca.MX.sym('dq', num_joints)
 
 # Joint accelerations.
-ca_ddq = ca.MX.sym('ddq', num_joints)
-
-# For solving the OCP, we use as the jerk of the system as the input. 
 ca_u = ca.MX.sym('u', num_joints)
 
 to_casadi = SymEngineToCasADiConverter([
@@ -119,20 +108,16 @@ ca_end_effector_positions = [
 
 ca_end_effector_positions_joined = ca.vertcat(*ca_end_effector_positions)
 
-# Build an AcadosModel from the URDF.
-
-
 model = AcadosModel()
 
 model.name = f'model_{robot_name}'
 
-# State vector (ddq becomes part of  the state because we model the system as being jerk-controlled).
-ca_state = ca.vertcat(ca_q, ca_dq, ca_ddq)
+ca_state = ca.vertcat(ca_q, ca_dq)
 model.x = ca_state
 
 # TODO: is there a special Linear ODE model in ACADOS?
 # Simple integrator chain.
-model.f_expl_expr = ca.vertcat(ca_dq, ca_ddq, ca_u)
+model.f_expl_expr = ca.vertcat(ca_dq, ca_u)
 model.u = ca_u
 
 # In case we want to use an implicit integrator.
@@ -158,20 +143,28 @@ ocp.dims.N = num_shooting_intervals
 # Path cost.
 #
 
+end_effector_coords_names = [
+  f'{link.name()}_{coord}/position' 
+  for link in end_effectors 
+  for coord in ['x', 'y', 'z'] 
+]
+
+# TODO: Tie this more closely to the cost expression.
+path_reference_names = [
+  f'{joint.name()}/acceleration' for joint in joints 
+] + end_effector_coords_names
+
 ocp.cost.cost_type = 'NONLINEAR_LS'
 
 ocp.model.cost_y_expr = ca.vertcat(
-  ca_u, # Penalize high jerk
-  ca_ddq, # Penalize high acceleration (approximately penalize hight torque)
+  ca_u, # Penalize high acceleration (approximately penalize high torque)
   ca_end_effector_positions_joined
 )
 
 # Weight matrix *can* be changed at run-time.
 ocp.cost.W = np.diag(
-  # Jerk penalty.
-  [0.005]*num_joints +
   # Acceleration penalty.
-  [0.005]*num_joints +
+  [0.01]*num_joints +
   # Position error penalty.
   [1.0]*ca_end_effector_positions_joined.rows()
 )
@@ -183,13 +176,17 @@ ocp.cost.yref = np.zeros(ocp.model.cost_y_expr.rows())
 # Terminal cost.
 #
 
+# TODO: Tie this more closely to the cost expression.
+terminal_reference_names = end_effector_coords_names
+
 ocp.cost.cost_type_e = 'NONLINEAR_LS'
 
+# Make sure this aligns with terminal_reference_names
 ocp.model.cost_y_expr_e = ca_end_effector_positions_joined
 
-ocp.cost.W_e = np.identity(ocp.model.cost_y_expr_e.rows())
+ocp.cost.W_e = 3.0 * np.identity(ocp.model.cost_y_expr_e.rows())
 
-ocp.cost.yref_e = 3.0 * np.zeros(ocp.model.cost_y_expr_e.rows())
+ocp.cost.yref_e = np.zeros(ocp.model.cost_y_expr_e.rows())
 
 #
 # Constraints 
@@ -199,9 +196,6 @@ ocp.cost.yref_e = 3.0 * np.zeros(ocp.model.cost_y_expr_e.rows())
 
 # Acceleration is penalized in the cost anyway, so ~10 G as an upper bound is probably reasonable.
 ddq_max = 100
-# I have trouble imagining jerk values. A jerk of 20 m/s³ is apparently at the lower end of a car braking abruptly.
-# We penalize high jerk anyway, so we can use a moderately high value for the constraint.
-dddq_max = 20
 
 # The joints don't have limits but it makes sense to constrain them to sensible ranges.
 # This helps the solver by confining the search space.
@@ -219,18 +213,35 @@ for joint in joints:
   if joint.limits_.vel_u_ == None:
     joint.limits_.vel_u_ = dq_max
 
-ocp.constraints.lbx = np.array([j.limits_.pos_l_ for j in joints] + [j.limits_.vel_l_ for j in joints] + [-ddq_max]*len(joints))
-ocp.constraints.ubx = np.array([j.limits_.pos_u_ for j in joints] + [j.limits_.vel_u_ for j in joints] + [ddq_max]*len(joints))
-ocp.constraints.idxbx = np.arange(nx)
+# Somehow ACADOS does not allow us to use soft constraints on the state directly...
+# But it's allowed on h(x) = x
+#model.con_h_expr = model.x
 
-ocp.constraints.lbu = np.array([-dddq_max]*nu)
-ocp.constraints.ubu = np.array([dddq_max]*nu)
+#ocp.constraints.lh = np.array([j.limits_.pos_l_ for j in joints] + [j.limits_.vel_l_ for j in joints] + [-ddq_max]*len(joints))
+#ocp.constraints.uh = np.array([j.limits_.pos_u_ for j in joints] + [j.limits_.vel_u_ for j in joints] + [ddq_max]*len(joints))
+
+# 
+#ocp.constraints.idxsbh = np.arange(nx)
+
+# cost for soft constraints
+#ocp.cost.Zu = 10*np.eye(len(ocp.constraints.idxsbu))
+#ocp.cost.Zl = 10*np.eye(len(ocp.constraints.idxsbu))
+
+ocp.constraints.lbu = np.array([-ddq_max]*nu)
+ocp.constraints.ubu = np.array([ddq_max]*nu)
 ocp.constraints.idxbu = np.arange(nu)
 
 # Initial state constraint. Populated at run-time.
 ocp.constraints.lbx_0 = np.zeros(nx)
 ocp.constraints.ubx_0 = np.zeros(nx)
 ocp.constraints.idxbx_0 = np.arange(nx)
+
+
+# Terminal state constraint (same logic as path constraints).
+#model.con_h_expr_e = model.con_h_expr
+#ocp.constraints.lh_e = ocp.constraints.lh
+#ocp.constraints.uh_e = ocp.constraints.uh
+#ocp.constraints.idxsbh_e = ocp.constraints.idxsbh
 
 #
 # Solver setup.
@@ -248,6 +259,8 @@ tempdir = tempfile.mkdtemp()
 code_dir = os.path.join(tempdir, model.name)
 
 print('Generating code in', code_dir)
+
+execdir = os.getcwd()
 
 os.chdir(tempdir)
 
@@ -307,39 +320,24 @@ with open(os.path.join(code_dir, 'CMakeLists.txt'), 'r+') as f:
 # Generate the metadata source file
 
 # The order of the state interfaces needs to match the order in which they appear in the state vector.
-state_interfaces = [
+state_names = [
   joint.name() + '/position' for joint in joints
 ] + [
   joint.name() + '/velocity' for joint in joints
-] + [
-  joint.name() + '/acceleration' for joint in joints
 ]
 
-command_interfaces = [
-  joint.name() + '/position' for joint in joints
-] + [
-  joint.name() + '/velocity' for joint in joints
-] + [
-  joint.name() + '/acceleration' for joint in joints
-]
-
-reference_interfaces = [
-  f'{link.name()}/position/{coord}' 
-  for link in end_effectors 
-  for coord in ['x', 'y', 'z'] 
-]
-
-print(reference_interfaces)
-
-get_controller_metadata = create_metadata_getter(
-  'get_controller_metadata', 
+ 
+get_input_names = create_metadata_getter(
+  'get_input_names', 
   {
-    'joints': [joint.name() for joint in joints],
-    'joints_actuated': [joint.name() for joint in joints_actuated],
-    'joints_free': [joint.name() for joint in joints_free],
-    'state_interfaces': state_interfaces,
-    'command_interfaces': command_interfaces,
-    'reference_interfaces': reference_interfaces
+    'states': state_names,
+    # We have technically constrained the entire state, but via h(x). The state isn't constrained directly.
+    'path_state_constraints': [],
+    'terminal_state_constraints': [],
+    'initial_state_constraints': state_names,
+    'path_references': path_reference_names,
+    'terminal_references': terminal_reference_names,
+    'controls': [f'{joint.name()}/acceleration' for joint in joints_actuated],
   }
 )
 
@@ -349,12 +347,17 @@ const char* get_acados_prefix() {{
 }}
 '''
 
-metadata_code = create_metadata_file([get_controller_metadata, get_acados_prefix])
+metadata_code = create_metadata_file([get_input_names, get_acados_prefix])
 
 with open(os.path.join(code_dir, 'controller_metadata.cpp'), 'w') as f:
 
   f.write(metadata_code)
 
-metadata_code = create_metadata_file([get_controller_metadata])
-
 builder.exec(code_dir)
+
+if len(sys.argv) >= 3:
+  lib_install_location = sys.argv[2]
+else:
+  lib_install_location = execdir
+
+os.system(f'mv {code_dir}/libacados_ocp_solver_{model.name}.so {lib_install_location}')
