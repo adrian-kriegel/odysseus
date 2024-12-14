@@ -2,29 +2,54 @@
   description = "Development environment for Odysseus.";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs";
+
     flake-utils.url = "github:numtide/flake-utils";
+
+    acados-overlay.url = "github:adrian-kriegel/acados-nix";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+    acados-overlay,
+  }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs { 
+          inherit system; 
+
+          overlays = [
+            acados-overlay.overlays.default
+          ];
+        };
+        
+        python = pkgs.python312.withPackages (ps: with ps; [ 
+          
+          numpy
+          sympy
+          symengine
+          casadi
+
+          # Only needed for the examples
+          pkgs.acados_template
+        ]);
       in {
         devShell = pkgs.mkShell {
-          packages = with pkgs; [
-            poetry
-            (python312.withPackages (ps: with ps; [ poetry-core ]))
-          ];
+          buildInputs = with pkgs; [ python acados ];
 
           shellHook = ''
             # required for python to find libstdc++ etc.
             export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${pkgs.stdenv.cc.cc.lib}/lib/:${pkgs.zlib}/lib/:${pkgs.glib.dev}/lib/:${pkgs.glib}/lib/
 
             # ACADOS Extrawurst
-            export ACADOS_SOURCE_DIR=${builtins.getEnv "PWD"}/submodules/acados
+            export ACADOS_SOURCE_DIR=${pkgs.acados}
             export ACADOS_DIR=$ACADOS_SOURCE_DIR
             export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ACADOS_DIR/lib
+            
+            # so we can import odysseus
+            export PYTHONPATH=$PYTHONPATH:$(pwd)
           '';
         };
       }

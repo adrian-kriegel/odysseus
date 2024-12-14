@@ -1,15 +1,33 @@
 {
   "nodes": {
+    "acados-overlay": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1734189832,
+        "narHash": "sha256-g3YJkY3L56hBxH0JpJAiWXasvjWnSjoyPy2SA2hnYxI=",
+        "owner": "adrian-kriegel",
+        "repo": "acados-nix",
+        "rev": "1093f964974e863f96c98240fd8ded6d40d57b1c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "adrian-kriegel",
+        "repo": "acados-nix",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1726560853,
-        "narHash": "sha256-X6rJYSESBVr3hBoH0WbKE5KvhPU5bloyZ2L4K60/fPQ=",
+        "lastModified": 1731533236,
+        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "c1dfcf08411b08f6b8615f7d8971a2bfa81d5e8a",
+        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
         "type": "github"
       },
       "original": {
@@ -20,24 +38,39 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1728627514,
-        "narHash": "sha256-r+SF9AnHrTg+bk6YszoKfV9lgyw+yaFUQe0dOjI0Z2o=",
+        "lastModified": 1734189744,
+        "narHash": "sha256-ALbkz2iO0vpejT3qAQWyW9GROPAIfJfUZW2g+EavMMs=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "c505ebf777526041d792a49d5f6dd4095ea391a7",
+        "rev": "c937a5c69748140315dd27865771697b5f1c74c7",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
-        "ref": "nixos-24.05",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1734189744,
+        "narHash": "sha256-ALbkz2iO0vpejT3qAQWyW9GROPAIfJfUZW2g+EavMMs=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c937a5c69748140315dd27865771697b5f1c74c7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
         "repo": "nixpkgs",
         "type": "github"
       }
     },
     "root": {
       "inputs": {
+        "acados-overlay": "acados-overlay",
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs_2"
       }
     },
     "systems": {
