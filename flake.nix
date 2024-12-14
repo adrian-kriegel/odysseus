@@ -32,6 +32,8 @@
           symengine
           casadi
 
+          pytest
+
           # Only needed for the examples
           pkgs.acados_template
         ]);
