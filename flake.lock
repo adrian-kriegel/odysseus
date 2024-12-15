@@ -5,11 +5,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1734189832,
-        "narHash": "sha256-g3YJkY3L56hBxH0JpJAiWXasvjWnSjoyPy2SA2hnYxI=",
+        "lastModified": 1734263651,
+        "narHash": "sha256-fzitCCeD9EnFKvLZQLIH0Mq9sfMgxlQ9tWhPcqJ1Rp4=",
         "owner": "adrian-kriegel",
         "repo": "acados-nix",
-        "rev": "1093f964974e863f96c98240fd8ded6d40d57b1c",
+        "rev": "c5dea5bda33b68259e4fcec2df26542568b86ea0",
         "type": "github"
       },
       "original": {
@@ -38,11 +38,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1734189744,
-        "narHash": "sha256-ALbkz2iO0vpejT3qAQWyW9GROPAIfJfUZW2g+EavMMs=",
+        "lastModified": 1734264201,
+        "narHash": "sha256-/AQGb4uNTvjVGcacHp8NxvPSk2s6mLe+w+8kGVZpCKw=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "c937a5c69748140315dd27865771697b5f1c74c7",
+        "rev": "461b8a40abb5f6e1087663d62d51a34c7fea82ac",
         "type": "github"
       },
       "original": {

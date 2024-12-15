@@ -7,5 +7,5 @@ setup(
    author='Adrian Kriegel',
    author_email='foo@example.com',
    packages=['odysseus'], 
-   install_requires=['symengine', 'sympy', 'casadi']
+   install_requires=['numpy', 'symengine', 'sympy', 'casadi']
 )
