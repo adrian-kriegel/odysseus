@@ -47,8 +47,6 @@
 
             # ACADOS Extrawurst
             export ACADOS_SOURCE_DIR=${pkgs.acados}
-            export ACADOS_DIR=$ACADOS_SOURCE_DIR
-            export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ACADOS_DIR/lib
             
             # so we can import odysseus
             export PYTHONPATH=$PYTHONPATH:$(pwd)
