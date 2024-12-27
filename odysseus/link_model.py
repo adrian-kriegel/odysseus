@@ -248,7 +248,7 @@ class Joint(Link):
         t = Symbol('t')
 
         # generalized coordinate representing the dof
-        self.q_ = Function(f'q_{name}')(t)
+        self.q_ = Function(f'{name}/position')(t)
 
         # actuation type of this joint
         self.actuation_ = actuation
@@ -260,6 +260,12 @@ class Joint(Link):
         Getter for the generalized coordinate.
         '''
         return self.q_
+
+    def coord_names(self): 
+        '''
+        Returns the names of the generalized coordinates.
+        '''
+        return [self.name()]
     
     def dof(self):
         '''
@@ -297,6 +303,7 @@ class JointFree(Joint):
         xyz : Matrix,
         rpy : Matrix,
         q : Matrix,
+        coord_names : list[str] = None,
         actuation : ActuationType = ActuationType.DIRECT,
         model : LinkModel | None = None,
         limits : JointLimits | None = None
@@ -320,11 +327,18 @@ class JointFree(Joint):
             raise Exception('q must be a function of time.')
 
         self.q_ = q
+        self.coord_names_ = coord_names if coord_names is not None else [f'{name}_{i}' for i in range(q.rows)]
 
         self.dof_ = len(q)
 
     def damping_force(self):
         return Matrix([ 0 for q in self.q() ])
+
+    def coord_names(self): 
+        '''
+        Returns the names of the generalized coordinates.
+        '''
+        return self.coord_names_
 
 
 class JointRevolute(Joint):
@@ -631,6 +645,16 @@ class LinkModel:
                 q.append(jq)
 
         return Matrix(q)
+
+    def coord_names(self, joints : list[Joint] | None = None):
+        '''
+        Yields the names of the generalized coordinates.
+        '''
+        if joints is None:
+            joints = self.joints()
+
+        for joint in joints:
+            yield from joint.coord_names()
 
     def generalized_forces(q, origin : Matrix, force : Matrix):
         '''
