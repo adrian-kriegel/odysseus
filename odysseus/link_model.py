@@ -429,7 +429,7 @@ class Segment(Link):
         origin : Transform,
         mass,
         inertia : Matrix,
-        inertial_offset = None
+        inertial_origin : Matrix | Transform = Transform()
     ):
         '''
         Keyword arguments:
@@ -438,18 +438,17 @@ class Segment(Link):
         origin          -- Transformation from the parent joint to the segment.
         mass            -- Mass term (symbolic or float). 
         inertia         -- Inertia matrix.
-        inertial_offset -- Offset between origin and the inertial origin.
+        inertial_origin -- Optional Transform (or position offset Matrix) from inertial origin to the segment origin.
         '''
         Link.__init__(self, name, parent=parent, origin=origin)
 
         self.m_ = mass   
         self.inertia_ = inertia
-        self.inertial_origin_ = Matrix([0,0,0]) if inertial_offset is None else inertial_offset
+        self.inertial_origin_ = inertial_origin if isinstance(inertial_origin, Transform) else Transform(trans=inertial_origin)
 
-    def global_inertial_origin(self):
-        ''' Returns the global position of the inertial origin. '''
+    def global_inertial_origin(self) -> Transform:
+        ''' Returns the global transform of the inertial origin. '''
         return self.get_transform() * self.inertial_origin_
-
 
     def lin_energy(self):
 
@@ -457,7 +456,7 @@ class Segment(Link):
         Linear kinetic energy.
         '''
 
-        x,y,z = self.global_inertial_origin()
+        x,y,z = self.global_inertial_origin().trans_
 
         t = Symbol('t')
 
@@ -484,7 +483,7 @@ class Segment(Link):
         Potential (gravitational) energy.
         '''
         
-        _,_,z = self.global_inertial_origin()
+        _,_,z = self.global_inertial_origin().trans_
 
         return self.m_ * g * z
 

@@ -66,7 +66,7 @@ segment0 = Segment(
     Transform(), 
     mass=m0, 
     inertia=J0, 
-    inertial_offset=Matrix([0,0,l0/2])
+    inertial_origin=Matrix([0,0,l0/2])
 )
 ```
 
@@ -87,7 +87,7 @@ segment1 = Segment(
     Transform(), 
     m1, 
     J1, 
-    inertial_offset=Matrix([0,0,l1/2])
+    inertial_origin=Matrix([0,0,l1/2])
 )
 ```
 

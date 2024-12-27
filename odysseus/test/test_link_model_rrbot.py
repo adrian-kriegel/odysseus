@@ -46,8 +46,8 @@ def test_rrbot():
 
     ## check that the model matches the manually determined equations
 
-    x0,y0,z0 = segment0.global_inertial_origin()
-    x1,y1,z1 = segment1.global_inertial_origin()
+    x0,y0,z0 = segment0.global_inertial_origin().trans_
+    x1,y1,z1 = segment1.global_inertial_origin().trans_
 
     transform = root.get_transform('root')
     transform1 = segment0.get_transform('root')

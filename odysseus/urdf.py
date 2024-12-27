@@ -127,10 +127,9 @@ class URDFElement:
             if origin_element:
                 rpy = URDFElement.parse_rotation(origin_element.attr('rpy'))
 
-                if rpy != Matrix([0,0,0]):
-                    raise Exception('Rotation of inertial origin not supported.')
+                xyz = URDFElement.parse_vector(origin_element.attr('xyz'))
 
-                inertial_origin = URDFElement.parse_vector(origin_element.attr('xyz'))
+                inertial_origin = Transform(xyz, rpy)
 
             inertia = inertia_matrix(**inertia_values)
 

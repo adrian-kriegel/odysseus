@@ -22,7 +22,7 @@ def test_link_model():
         damping=0.7
     )
 
-    segment0 = Segment('segment0', joint0, Transform(), 1, inertia_matrix(), inertial_offset=Matrix([0,0,0.5]))
+    segment0 = Segment('segment0', joint0, Transform(), 1, inertia_matrix(), inertial_origin=Matrix([0,0,0.5]))
 
     joint1 = JointRevolute(
         'joint1',
