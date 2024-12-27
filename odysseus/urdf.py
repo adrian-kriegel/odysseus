@@ -257,6 +257,15 @@ class URDFModel:
 
         self.transform_element_ = lambda element, parent: element.as_sym_lm(parent)
 
+    def get_robot_name(self):
+
+        robot = self.dom_.getElementsByTagName('robot')
+
+        if len(robot) > 0:
+            return robot[0].getAttribute('name')
+        else:
+            raise Exception('No <robot> tag found in URDF.')
+
     def transform_elements(self, callback):
         '''
         Override the behavior of turning URDFElement into a Link object.

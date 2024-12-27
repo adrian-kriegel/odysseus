@@ -15,6 +15,8 @@ def test_urdf_transforms():
 
     robot = URDFModel(doc)
 
+    assert robot.get_robot_name() == 'anymal'
+
     joints_external = [
         'inspection_payload_pan_to_tilt',
         'inspection_payload_mount_to_pan'
