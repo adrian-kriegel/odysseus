@@ -229,6 +229,18 @@ class ActuationType(Enum):
     # Directly actuated joint.
     DIRECT = 3
 
+class JointLimits:
+
+    def __init__(self, pos_l = None, pos_u = None, vel_l = None, vel_u = None, idx_q : list[int] = []):
+
+        self.pos_l_ = pos_l
+        self.pos_u_ = pos_u
+        self.vel_l_ = vel_l
+        self.vel_u_ = vel_u
+
+        # Indices of q that are affected by the limits
+        self.idx_q_ = []
+
 
 class Joint(Link):
     '''
@@ -241,6 +253,7 @@ class Joint(Link):
         origin : Transform,
         parent : Link,
         actuation : ActuationType = ActuationType.DIRECT,
+        limits : JointLimits = JointLimits(),
         model : LinkModel | None = None
     ):
         Link.__init__(self, name, origin, parent, fixed=False, model=model)
@@ -254,6 +267,8 @@ class Joint(Link):
         self.actuation_ = actuation
 
         self.dof_ = 1
+
+        self.limits_ = limits
 
     def q(self):
         ''' 
@@ -279,18 +294,6 @@ class Joint(Link):
         '''
         raise NotImplemented()
 
-class JointLimits:
-
-    def __init__(self, pos_l = None, pos_u = None, vel_l = None, vel_u = None, idx_q : list[int] = []):
-
-        self.pos_l_ = pos_l
-        self.pos_u_ = pos_u
-        self.vel_l_ = vel_l
-        self.vel_u_ = vel_u
-
-        # Indices of q that are affected by the limits
-        self.idx_q_ = []
-
 class JointFree(Joint):
     '''
     Joint moving freely according to its origins DOF.
@@ -306,7 +309,7 @@ class JointFree(Joint):
         coord_names : list[str] = None,
         actuation : ActuationType = ActuationType.DIRECT,
         model : LinkModel | None = None,
-        limits : JointLimits | None = None
+        limits : JointLimits = JointLimits()
     ):
         '''
         Keyword arguments:
@@ -317,11 +320,9 @@ class JointFree(Joint):
         model       -- LinkModel.
         '''
 
-        self.limits_ = limits
-
         origin = Transform(xyz, rpy)
 
-        Joint.__init__(self, name, parent, origin, actuation=actuation, model=model)
+        Joint.__init__(self, name, parent, origin, actuation=actuation, model=model, limits=limits)
 
         if q.rows > 0 and diff(q, 't').is_zero_matrix:
             raise Exception('q must be a function of time.')
@@ -362,7 +363,7 @@ class JointRevolute(Joint):
         damping     -- Scalar damping factor.
         '''
 
-        Joint.__init__(self, name, parent, origin, actuation=actuation)
+        Joint.__init__(self, name, parent, origin, actuation=actuation, limits=limits)
 
         self.axis_ = axis
 
@@ -370,8 +371,6 @@ class JointRevolute(Joint):
         self.origin_ = self.origin_ * Transform.from_axis_angle(self.axis_, self.q())
 
         self.damping_ = damping
-
-        self.limits_ = limits
 
     def damping_torque(self):
         '''
@@ -391,7 +390,8 @@ class JointLinear(Joint):
         origin : Transform,
         axis : Matrix,
         damping = 0,
-        actuation : ActuationType = ActuationType.DIRECT
+        actuation : ActuationType = ActuationType.DIRECT,
+        limits : JointLimits = JointLimits()
     ):
         '''
         Keyword arguments:
@@ -402,7 +402,7 @@ class JointLinear(Joint):
         damping     -- Scalar damping factor.
         '''
 
-        Joint.__init__(self, name, parent, origin, actuation=actuation)
+        Joint.__init__(self, name, parent, origin, actuation=actuation, limits=limits)
 
         self.axis_ = axis
 
