@@ -37,6 +37,11 @@ def diff(f, x, foreach=False):
     else:
         return se.diff(f, x)
 
+def to_matrix(x):
+    if isinstance(x, Matrix):
+        return x
+    else:
+        return Matrix(list(x))
 
 class Transform:
     '''
@@ -45,16 +50,30 @@ class Transform:
     def __init__(self, trans : Matrix | None = None, angles : Matrix | None = None, rot : Matrix | None = None):
 
         self.trans_ = Matrix([0,0,0]) if trans is None else trans
-        
+
         if angles is not None and rot is not None:
             raise Exception('Construct Transform either using angles or rot.')
-        
+
+        if not isinstance(self.trans_, Matrix):
+            # Try to convert whatever self.trans_ is to a Matrix
+            self.trans_ = Matrix(list(self.trans_))
+            assert self.trans_.rows == 3
+
         if angles is not None:
             self.rot_ = Transform._rpy_to_matrix(angles)
         elif rot is not None:
-            self.rot_ = rot
+            self.rot_ = rot if isinstance(rot, Matrix) else Matrix(list(rot))
         else:
             self.rot_ = eye(3) 
+    
+    def Identity() -> Self:
+        return Transform()
+
+    def position(self) -> Matrix:
+        return self.trans_
+
+    def rotation_matrix(self) -> Matrix:
+        return self.rot_
 
     def inverse(self) -> Transform:
         rt = self.rot_.transpose()
