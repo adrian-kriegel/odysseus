@@ -15,6 +15,7 @@ from odysseus import \
     LinkModel, \
     Joint,\
     JointRevolute, \
+    JointLinear, \
     Link, \
     Segment, \
     Transform,\
@@ -77,7 +78,7 @@ class URDFElement:
     def tag(self): 
         return self.node_.tagName
     
-    def origin(self):
+    def origin(self) -> Transform:
 
         origin = self.child('origin')
 
@@ -115,10 +116,10 @@ class URDFElement:
             inertia_values = {}
 
             if inertia_element:
-                inertia_values = { k: approximate_integers(float(v)) for k,v in inertia_element.node_.attributes.items() }
+                inertia_values = { k: approximate_integers(float(v), 1e-3) for k,v in inertia_element.node_.attributes.items() }
 
             if mass_element:
-                mass = approximate_integers(float(mass_element.attr('value', 0)), 1e-6)
+                mass = approximate_integers(float(mass_element.attr('value', 0)), 1e-3)
             else:
                 mass = 0
 
@@ -171,6 +172,15 @@ class URDFElement:
             # A hinge joint that rotates along the axis and has a limited range specified by the upper and lower limits. 
             case 'revolute':
                 return JointRevolute(
+                    self.attr('name'),
+                    parent,
+                    self.origin(),
+                    self.axis(),
+                    self.get_damping(),
+                    limits=limits
+                )
+            case 'prismatic':
+                return JointLinear(
                     self.attr('name'),
                     parent,
                     self.origin(),
@@ -234,7 +244,7 @@ class URDFElement:
     @staticmethod
     def parse_rotation(v : str | None) -> Matrix:
 
-        return URDFElement.parse_vector(v, approximate_angle)
+        return URDFElement.parse_vector(v, lambda x: approximate_angle(x, 1e-3))
 
 class URDFModel:
     '''
